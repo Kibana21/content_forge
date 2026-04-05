@@ -68,3 +68,5 @@ video-key.json
 
 #videos 
 *.mp4
+
+.claude/
