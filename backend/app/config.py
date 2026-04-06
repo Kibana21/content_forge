@@ -5,11 +5,14 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/story_studio"
     REDIS_URL: str = "redis://default:7kqABVVfvMLYoFvNSyP3WDgRRT71L43f@redis-10454.c83.us-east-1-2.ec2.cloud.redislabs.com:10454/0"
 
-    # Google Vertex AI
+    # Gemini API (text features)
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
+    # Google Vertex AI (video generation)
     GOOGLE_APPLICATION_CREDENTIALS: str = "../video-key.json"
     GOOGLE_CLOUD_PROJECT: str = "gen-lang-client-0913704662"
     GOOGLE_CLOUD_LOCATION: str = "us-central1"
-    GEMINI_MODEL: str = "gemini-2.0-flash-001"
 
     # JWT
     JWT_SECRET_KEY: str = "dev-secret-key-change-in-production"

@@ -1,9 +1,5 @@
-import os
 from google import genai
 from app.config import settings
-
-# GOOGLE_APPLICATION_CREDENTIALS env var is picked up automatically by the SDK
-os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", settings.GOOGLE_APPLICATION_CREDENTIALS)
 
 _client: genai.Client | None = None
 
@@ -11,11 +7,7 @@ _client: genai.Client | None = None
 def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = genai.Client(
-            vertexai=True,
-            project=settings.GOOGLE_CLOUD_PROJECT,
-            location=settings.GOOGLE_CLOUD_LOCATION,
-        )
+        _client = genai.Client(api_key=settings.GEMINI_API_KEY)
     return _client
 
 
