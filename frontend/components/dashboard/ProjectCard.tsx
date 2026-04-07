@@ -1,9 +1,11 @@
 "use client";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Project } from "@/lib/types/project";
 import { Badge } from "@/components/ui/Badge";
 import { VIDEO_TYPE_LABELS } from "@/lib/types/project";
 import { scenesToDurationLabel } from "@/lib/utils/duration";
+import { projectsApi } from "@/lib/api/projects";
 
 const GRADIENTS: Record<string, string> = {
   product_explainer: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
@@ -17,16 +19,32 @@ const GRADIENTS: Record<string, string> = {
 
 interface ProjectCardProps {
   project: Project;
+  onDeleted?: (id: string) => void;
 }
 
-export function ProjectCard({ project }: ProjectCardProps) {
+export function ProjectCard({ project, onDeleted }: ProjectCardProps) {
   const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const gradient = project.video_type ? GRADIENTS[project.video_type] : GRADIENTS.educational;
   const presenterInitial = project.presenter?.name?.[0]?.toUpperCase() || "?";
   const videoCount = project.videos?.length || 0;
 
+  async function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirming) { setConfirming(true); return; }
+    setDeleting(true);
+    try {
+      await projectsApi.delete(project.id);
+      onDeleted?.(project.id);
+    } finally {
+      setDeleting(false);
+      setConfirming(false);
+    }
+  }
+
   return (
-    <div className="project-card" onClick={() => router.push(`/projects/${project.id}`)}>
+    <div className="project-card" onClick={() => !confirming && router.push(`/projects/${project.id}`)}>
       <div className="project-card-thumb" style={{ background: gradient }}>
         {project.video_type && (
           <span className="badge badge-video" style={{ position: "absolute", bottom: 12, left: 12 }}>
@@ -34,13 +52,26 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </span>
         )}
         {videoCount > 0 && (
-          <span
-            className="badge badge-video"
-            style={{ position: "absolute", top: 12, right: 12 }}
-          >
+          <span className="badge badge-video" style={{ position: "absolute", top: 12, right: 12 }}>
             ▶ {videoCount} video{videoCount > 1 ? "s" : ""}
           </span>
         )}
+        {/* Delete button on hover */}
+        <button
+          onClick={handleDelete}
+          title={confirming ? "Click again to confirm" : "Delete project"}
+          style={{
+            position: "absolute", top: 10, left: 10,
+            background: confirming ? "#dc2626" : "rgba(0,0,0,0.5)",
+            border: "none", borderRadius: 6, color: "#fff",
+            fontSize: 11, fontWeight: 700, padding: "4px 8px",
+            cursor: "pointer", opacity: confirming ? 1 : 0,
+            transition: "opacity 0.15s",
+          }}
+          className="project-card-delete"
+        >
+          {deleting ? "Deleting…" : confirming ? "Confirm delete?" : "🗑 Delete"}
+        </button>
       </div>
       <div className="project-card-body">
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>

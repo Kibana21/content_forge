@@ -267,6 +267,7 @@ select.form-control { cursor: pointer; }
   box-shadow: var(--shadow-sm);
 }
 .project-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.project-card:hover .project-card-delete { opacity: 1 !important; }
 .project-card-thumb { height: 140px; display: flex; align-items: flex-end; padding: 12px; position: relative; }
 .project-card-body { padding: 16px; }
 .project-card-footer { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }

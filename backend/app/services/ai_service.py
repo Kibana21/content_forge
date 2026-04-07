@@ -1,4 +1,6 @@
 from google import genai
+from google.genai.types import HttpOptions
+from google.oauth2 import service_account
 from app.config import settings
 
 _client: genai.Client | None = None
@@ -7,7 +9,17 @@ _client: genai.Client | None = None
 def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        credentials = service_account.Credentials.from_service_account_file(
+            settings.GOOGLE_APPLICATION_CREDENTIALS,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        _client = genai.Client(
+            vertexai=True,
+            project=settings.GOOGLE_CLOUD_PROJECT,
+            location=settings.GOOGLE_CLOUD_LOCATION,
+            credentials=credentials,
+            http_options=HttpOptions(api_version="v1"),
+        )
     return _client
 
 

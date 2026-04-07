@@ -5,7 +5,7 @@ from sqlalchemy import select
 from app.models.scene import Scene
 from app.models.project import Project
 from app.models.presenter import Presenter
-from app.schemas.scene import SceneUpdate
+from app.schemas.scene import SceneCreate, SceneUpdate
 from app.core.exceptions import NotFoundError, ForbiddenError
 from app.services import ai_service
 
@@ -124,6 +124,38 @@ async def delete_scene(db: AsyncSession, scene_id: UUID, user_id: UUID) -> None:
         raise ForbiddenError()
     await db.delete(scene)
     await db.commit()
+
+
+async def create_scene(db: AsyncSession, project_id: UUID, data: SceneCreate, user_id: UUID) -> list[Scene]:
+    """Insert a new blank scene after insert_after_sequence, then renumber all scenes."""
+    proj = await db.execute(select(Project).where(Project.id == project_id))
+    project = proj.scalar_one_or_none()
+    if not project:
+        raise NotFoundError("Project not found")
+    if project.user_id != user_id:
+        raise ForbiddenError()
+
+    # Load existing scenes ordered
+    existing = await get_project_scenes(db, project_id, user_id)
+
+    insert_after = data.insert_after_sequence or len(existing)
+
+    # Shift sequence numbers up for scenes after insertion point
+    for scene in existing:
+        if scene.sequence_number > insert_after:
+            scene.sequence_number += 1
+
+    new_scene = Scene(
+        project_id=project_id,
+        sequence_number=insert_after + 1,
+        name=data.name or f"Scene {insert_after + 1}",
+        dialogue=data.dialogue or "",
+        setting=data.setting or "",
+        camera_framing=data.camera_framing or "Medium close-up",
+    )
+    db.add(new_scene)
+    await db.commit()
+    return await get_project_scenes(db, project_id, user_id)
 
 
 async def reorder_scenes(db: AsyncSession, project_id: UUID, scene_ids: list[UUID], user_id: UUID) -> list[Scene]:

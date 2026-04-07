@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.scene import SceneUpdate, SceneResponse, SceneReorderRequest
+from app.schemas.scene import SceneCreate, SceneUpdate, SceneResponse, SceneReorderRequest
 from app.services import scene_service
 
 router = APIRouter()
@@ -18,6 +18,16 @@ async def list_scenes(
     db: AsyncSession = Depends(get_db),
 ):
     return await scene_service.get_project_scenes(db, project_id, current_user.id)
+
+
+@router.post("/projects/{project_id}/scenes", response_model=list[SceneResponse], status_code=201)
+async def create_scene(
+    project_id: UUID,
+    body: SceneCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await scene_service.create_scene(db, project_id, body, current_user.id)
 
 
 @router.post("/projects/{project_id}/scenes/generate", response_model=list[SceneResponse], status_code=201)

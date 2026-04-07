@@ -4,6 +4,14 @@ from datetime import datetime
 from typing import Optional
 
 
+class SceneCreate(BaseModel):
+    name: Optional[str] = None
+    dialogue: Optional[str] = None
+    setting: Optional[str] = None
+    camera_framing: Optional[str] = "Medium close-up"
+    insert_after_sequence: Optional[int] = None  # insert after this position; None = append
+
+
 class SceneUpdate(BaseModel):
     name: Optional[str] = None
     dialogue: Optional[str] = None

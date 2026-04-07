@@ -5,9 +5,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/story_studio"
     REDIS_URL: str = "redis://default:7kqABVVfvMLYoFvNSyP3WDgRRT71L43f@redis-10454.c83.us-east-1-2.ec2.cloud.redislabs.com:10454/0"
 
-    # Gemini API (text features)
+    # Gemini API key (kept for reference, not used for text generation)
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    # Vertex AI text model
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     # Google Vertex AI (video generation)
     GOOGLE_APPLICATION_CREDENTIALS: str = "../video-key.json"
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     # Dev mode bypasses auth — hardcoded dev user for all requests
     DEV_MODE: bool = True
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()

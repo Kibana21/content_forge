@@ -65,7 +65,7 @@ export default function DashboardPage() {
         ) : (
           <div className="project-grid">
             {filtered.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard key={project.id} project={project} onDeleted={(id) => fetchProjects()} />
             ))}
             {filtered.length === 0 && (
               <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 0", color: "var(--text-tertiary)" }}>

@@ -1,5 +1,6 @@
 "use client";
-import { use } from "react";
+import { use, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/ui/AppHeader";
 import { Button } from "@/components/ui/Button";
@@ -10,15 +11,30 @@ import { VideosSection } from "@/components/project/VideosSection";
 import { useProject } from "@/hooks/useProject";
 import { useVideoPolling } from "@/hooks/useVideoPolling";
 import { videosApi } from "@/lib/api/videos";
+import { projectsApi } from "@/lib/api/projects";
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const { project, mutate } = useProject(id);
   const { videos, setVideos } = useVideoPolling(project?.videos || []);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleGenerateVideo() {
     const video = await videosApi.generate(id);
     setVideos((prev) => [video, ...prev]);
+  }
+
+  async function handleDeleteProject() {
+    if (!deleteConfirm) { setDeleteConfirm(true); return; }
+    setDeleting(true);
+    try {
+      await projectsApi.delete(id);
+      router.push("/");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   if (!project) {
@@ -36,7 +52,22 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     <>
       <AppHeader
         showAutosave
-        right={<Link href="/"><Button variant="ghost">My Projects</Button></Link>}
+        right={
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDeleteProject}
+              style={deleteConfirm ? { color: "#dc2626", borderColor: "#dc2626" } : { color: "var(--text-tertiary)" }}
+            >
+              {deleting ? "Deleting…" : deleteConfirm ? "Confirm delete?" : "🗑 Delete project"}
+            </Button>
+            {deleteConfirm && (
+              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirm(false)}>Cancel</Button>
+            )}
+            <Link href="/"><Button variant="ghost">My Projects</Button></Link>
+          </div>
+        }
       />
       <div className="project-shell">
         <div className="breadcrumb">
