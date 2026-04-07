@@ -1,12 +1,14 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.scene import SceneCreate, SceneUpdate, SceneResponse, SceneReorderRequest
-from app.services import scene_service
+from app.schemas.project import ProjectResponse
+from app.services import scene_service, project_service
 
 router = APIRouter()
 
@@ -30,13 +32,20 @@ async def create_scene(
     return await scene_service.create_scene(db, project_id, body, current_user.id)
 
 
-@router.post("/projects/{project_id}/scenes/generate", response_model=list[SceneResponse], status_code=201)
+class GenerateScenesResponse(BaseModel):
+    scenes: list[SceneResponse]
+    project: ProjectResponse
+
+
+@router.post("/projects/{project_id}/scenes/generate", response_model=GenerateScenesResponse, status_code=201)
 async def generate_scenes(
     project_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await scene_service.generate_scenes(db, project_id, current_user.id)
+    scenes = await scene_service.generate_scenes(db, project_id, current_user.id)
+    project = await project_service.get_project(db, project_id, current_user.id)
+    return GenerateScenesResponse(scenes=scenes, project=project)
 
 
 @router.patch("/scenes/{scene_id}", response_model=SceneResponse)

@@ -84,12 +84,13 @@ async def get_stats(db: AsyncSession, user_id: UUID) -> ProjectStatsResponse:
 
 
 async def export_project(db: AsyncSession, project_id: UUID, user_id: UUID, req: ExportRequest) -> dict:
+    from app.services import version_service
     project = await get_project(db, project_id, user_id)
     scenes = sorted(project.scenes, key=lambda s: s.sequence_number)
     presenter = project.presenter
 
     if req.format == "script_only":
-        return {
+        result = {
             "format": "script_only",
             "title": project.title,
             "script": project.script,
@@ -98,9 +99,11 @@ async def export_project(db: AsyncSession, project_id: UUID, user_id: UUID, req:
                 for s in scenes
             ],
         }
+        await version_service.save_export_version(db, project_id, user_id, req.format, result)
+        return result
 
     if req.format == "json":
-        return {
+        result = {
             "format": "json",
             "project": {
                 "id": str(project.id),
@@ -130,9 +133,11 @@ async def export_project(db: AsyncSession, project_id: UUID, user_id: UUID, req:
                 for s in scenes
             ],
         }
+        await version_service.save_export_version(db, project_id, user_id, req.format, result)
+        return result
 
     # full_package (default)
-    return {
+    result = {
         "format": "full_package",
         "title": project.title,
         "presenter": f"{presenter.name} — {presenter.speaking_style}" if presenter else "No presenter",
@@ -150,3 +155,6 @@ async def export_project(db: AsyncSession, project_id: UUID, user_id: UUID, req:
             for s in scenes
         ],
     }
+
+    await version_service.save_export_version(db, project_id, user_id, req.format, result)
+    return result

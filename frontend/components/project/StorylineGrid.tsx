@@ -16,6 +16,7 @@ function StorylineCard({
   summary,
   editLabel,
   onEdit,
+  badge,
 }: {
   icon: string;
   iconBg: string;
@@ -23,14 +24,23 @@ function StorylineCard({
   summary: string;
   editLabel: string;
   onEdit: () => void;
+  badge?: string | null;
 }) {
   return (
     <div className="storyline-card" onClick={onEdit}>
       <div className="storyline-icon" style={{ background: iconBg }}>
         {icon}
       </div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>
-        {title}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{title}</div>
+        {badge && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, background: "var(--primary-light)",
+            color: "var(--primary)", padding: "1px 7px", borderRadius: 20, whiteSpace: "nowrap",
+          }}>
+            {badge}
+          </span>
+        )}
       </div>
       <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
         {summary}
@@ -75,6 +85,10 @@ export function StorylineGrid({ project }: StorylineGridProps) {
       ? `${project.scenes.length} scenes across ${project.target_duration || 0}s. Presenter + brand locked on every scene.`
       : "No scenes generated yet.";
 
+  const storyboardVersionNote = project.storyboard_script_version != null
+    ? `Generated from script v${project.storyboard_script_version}`
+    : null;
+
   return (
     <div className="storyline-grid">
       <StorylineCard
@@ -108,6 +122,7 @@ export function StorylineGrid({ project }: StorylineGridProps) {
         summary={storyboardSummary}
         editLabel="Edit Storyboard"
         onEdit={() => goToStep(4)}
+        badge={storyboardVersionNote}
       />
     </div>
   );

@@ -1,10 +1,13 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional
 
 from app.core.dependencies import get_current_user
+from app.database import get_db
 from app.models.user import User
-from app.services import ai_service
+from app.services import ai_service, version_service
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -18,12 +21,14 @@ class AppearanceResponse(BaseModel):
 
 
 class DraftScriptRequest(BaseModel):
+    project_id: Optional[UUID] = None  # if provided, version is saved
     video_type: Optional[str] = None
     target_audience: Optional[str] = None
     key_message: Optional[str] = None
     brand_kit: Optional[str] = None
     target_duration: Optional[int] = None
     call_to_action: Optional[str] = None
+    tone: Optional[str] = None  # comma-separated preset keys and/or custom text
 
 
 class DraftScriptResponse(BaseModel):
@@ -31,8 +36,9 @@ class DraftScriptResponse(BaseModel):
 
 
 class RewriteScriptRequest(BaseModel):
+    project_id: Optional[UUID] = None  # if provided, version is saved
     script: str
-    tone: str  # warm_personal | more_professional | shorter | stronger_cta
+    tone: str
 
 
 class RewriteScriptResponse(BaseModel):
@@ -58,8 +64,14 @@ async def generate_appearance(
 async def draft_script(
     body: DraftScriptRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     script = await ai_service.draft_script(body.model_dump())
+    if body.project_id:
+        from app.lib.wordcount import word_count
+        wc = word_count(script)
+        label = f"Auto-draft{' · ' + body.tone if body.tone else ''}"
+        await version_service.save_script_version(db, body.project_id, current_user.id, script, wc, body.tone, label)
     return DraftScriptResponse(script=script)
 
 
@@ -67,8 +79,14 @@ async def draft_script(
 async def rewrite_script(
     body: RewriteScriptRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     script = await ai_service.rewrite_script(body.script, body.tone)
+    if body.project_id:
+        from app.lib.wordcount import word_count
+        wc = word_count(script)
+        label = f"Rewrite · {body.tone}"
+        await version_service.save_script_version(db, body.project_id, current_user.id, script, wc, body.tone, label)
     return RewriteScriptResponse(script=script)
 
 

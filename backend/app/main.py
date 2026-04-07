@@ -39,14 +39,18 @@ app.add_middleware(
 )
 
 # Import and register routers
-from app.routers import auth, projects, presenters, scenes, videos, ai  # noqa: E402
+from app.routers import auth, projects, presenters, scenes, videos, ai, script_versions, exports  # noqa: E402
+# Ensure new models are imported so SQLAlchemy registers them
+from app.models import script_version, project_export  # noqa: F401
 
-app.include_router(auth.router,       prefix="/auth",       tags=["auth"])
-app.include_router(projects.router,   prefix="/projects",   tags=["projects"])
-app.include_router(presenters.router, prefix="/presenters", tags=["presenters"])
-app.include_router(scenes.router,     tags=["scenes"])
-app.include_router(videos.router,     tags=["videos"])
-app.include_router(ai.router,         prefix="/ai",         tags=["ai"])
+app.include_router(auth.router,            prefix="/auth",       tags=["auth"])
+app.include_router(projects.router,        prefix="/projects",   tags=["projects"])
+app.include_router(presenters.router,      prefix="/presenters", tags=["presenters"])
+app.include_router(scenes.router,          tags=["scenes"])
+app.include_router(videos.router,          tags=["videos"])
+app.include_router(ai.router,              prefix="/ai",         tags=["ai"])
+app.include_router(script_versions.router, prefix="/projects",   tags=["script-versions"])
+app.include_router(exports.router,         prefix="/projects",   tags=["exports"])
 
 
 @app.get("/health")

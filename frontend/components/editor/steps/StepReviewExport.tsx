@@ -1,36 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { Project } from "@/lib/types/project";
 import { Button } from "@/components/ui/Button";
 import { useEditorStore } from "@/stores/useEditorStore";
 import { projectsApi } from "@/lib/api/projects";
+import { versionsApi, type ExportVersion } from "@/lib/api/versions";
 import { wordCount } from "@/lib/utils/wordCount";
 import { scenesToDurationLabel } from "@/lib/utils/duration";
 import { SPEAKING_STYLE_LABELS } from "@/lib/types/presenter";
+import { ExportViewerModal, EXPORT_FORMATS, type ExportFormat } from "@/components/ui/ExportViewerModal";
 
-type ExportFormat = "full_package" | "script_only" | "json";
-
-const FORMATS: { key: ExportFormat; icon: string; title: string; desc: string }[] = [
-  {
-    key: "full_package",
-    icon: "📦",
-    title: "Full Package",
-    desc: "Scene-by-scene brief with presenter description and visuals. Ready for your video team or AI tool.",
-  },
-  {
-    key: "script_only",
-    icon: "📄",
-    title: "Script Only",
-    desc: "Clean script document with scene markers. Good for review or voiceover recording.",
-  },
-  {
-    key: "json",
-    icon: "💾",
-    title: "Technical (JSON)",
-    desc: "Structured data file for direct import into AI video generation platforms.",
-  },
-];
+const FORMATS = EXPORT_FORMATS;
 
 interface StepReviewExportProps {
   project: Project;
@@ -42,39 +23,64 @@ export function StepReviewExport({ project, onSaved }: StepReviewExportProps) {
   const { reset } = useEditorStore();
   const [format, setFormat] = useState<ExportFormat>("full_package");
   const [exporting, setExporting] = useState(false);
+  const [exportHistory, setExportHistory] = useState<ExportVersion[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [viewingExport, setViewingExport] = useState<ExportVersion | null>(null);
 
   const wc = project.script ? wordCount(project.script) : 0;
   const scenes = project.scenes || [];
   const presenter = project.presenter;
 
+  useEffect(() => {
+    versionsApi.listExports(project.id).then(setExportHistory).catch(() => {});
+  }, [project.id]);
+
   async function handleExport() {
     setExporting(true);
     try {
-      const result = await projectsApi.export(project.id, format);
+      await projectsApi.export(project.id, format);
       const updated = await projectsApi.update(project.id, { status: "exported" });
       onSaved(updated);
 
-      if (format === "json") {
-        const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${project.title.replace(/\s+/g, "_")}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        console.log("Export:", result);
+      // Refresh export history and open the newest version in the viewer
+      const history = await versionsApi.listExports(project.id);
+      setExportHistory(history);
+      if (history.length > 0) {
+        setShowHistory(true);
+        setViewingExport(history[0]); // newest first
       }
-
-      reset();
-      router.push(`/projects/${project.id}`);
     } finally {
       setExporting(false);
     }
   }
 
+  function downloadVersion(ev: ExportVersion) {
+    const data = JSON.parse(ev.export_json);
+    const ext = ev.format === "script_only" ? "txt" : "json";
+    const content = ev.format === "script_only"
+      ? (data.scenes || []).map((s: { scene: number; name: string; dialogue: string }) =>
+          `Scene ${s.scene} — ${s.name}\n\n${s.dialogue}`
+        ).join("\n\n---\n\n")
+      : JSON.stringify(data, null, 2);
+    const mimeType = ev.format === "script_only" ? "text/plain" : "application/json";
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project.title.replace(/\s+/g, "_")}_v${ev.version_number}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div>
+      {viewingExport && (
+        <ExportViewerModal
+          ev={viewingExport}
+          onClose={() => setViewingExport(null)}
+          onDownload={() => downloadVersion(viewingExport)}
+        />
+      )}
       <div className="page-content">
         <h1 style={{ fontSize: 24, fontWeight: 800, margin: "0 0 6px" }}>Review & Export</h1>
         <p style={{ color: "var(--text-secondary)", margin: "0 0 28px", fontSize: 15 }}>
@@ -148,7 +154,7 @@ export function StepReviewExport({ project, onSaved }: StepReviewExportProps) {
         </div>
 
         {/* Export format */}
-        <div className="card">
+        <div className="card" style={{ marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Export Format</div>
           <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-secondary)" }}>
             Choose how you&apos;d like to export your package.
@@ -169,13 +175,78 @@ export function StepReviewExport({ project, onSaved }: StepReviewExportProps) {
             ))}
           </div>
         </div>
+
+        {/* Export history */}
+        {exportHistory.length > 0 && (
+          <div className="card">
+            <div
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+              onClick={() => setShowHistory((v) => !v)}
+            >
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>Export history</div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                  {exportHistory.length} previous export{exportHistory.length > 1 ? "s" : ""}
+                </div>
+              </div>
+              <span style={{ fontSize: 18, color: "var(--text-tertiary)", userSelect: "none" }}>
+                {showHistory ? "▲" : "▼"}
+              </span>
+            </div>
+
+            {showHistory && (
+              <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+                {exportHistory.map((ev) => (
+                  <div
+                    key={ev.id}
+                    style={{
+                      border: "1px solid var(--border)", borderRadius: "var(--radius)",
+                      padding: "10px 14px", display: "flex", alignItems: "center",
+                      justifyContent: "space-between", gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, background: "var(--primary-light)",
+                          color: "var(--primary)", padding: "2px 7px", borderRadius: 20,
+                        }}>
+                          v{ev.version_number}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>
+                          {FORMATS.find((f) => f.key === ev.format)?.title || ev.format}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                        {new Date(ev.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <Button variant="outline" size="sm" onClick={() => setViewingExport(ev)}>
+                        View
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => downloadVersion(ev)}>
+                        ↓ Download
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="step-footer">
         <Button variant="ghost" onClick={() => useEditorStore.getState().goToStep(4)}>← Back</Button>
-        <Button size="lg" loading={exporting} onClick={handleExport}>
-          Export Package
-        </Button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Button variant="outline" onClick={() => { reset(); router.push(`/projects/${project.id}`); }}>
+            Go to Project
+          </Button>
+          <Button size="lg" loading={exporting} onClick={handleExport}>
+            Export Package
+          </Button>
+        </div>
       </div>
     </div>
   );

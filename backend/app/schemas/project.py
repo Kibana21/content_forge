@@ -31,6 +31,7 @@ class ProjectUpdate(BaseModel):
     tone: Optional[str] = None
     word_count: Optional[int] = None
     status: Optional[ProjectStatus] = None
+    storyboard_script_version: Optional[int] = None
     presenter_id: Optional[UUID] = None
 
 
@@ -48,6 +49,7 @@ class ProjectResponse(BaseModel):
     tone: Optional[str]
     word_count: Optional[int]
     status: ProjectStatus
+    storyboard_script_version: Optional[int]
     presenter_id: Optional[UUID]
     presenter: Optional[PresenterResponse]
     scenes: list[SceneResponse] = []

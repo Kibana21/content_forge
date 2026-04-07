@@ -40,8 +40,11 @@ class Project(Base, UUIDMixin, TimestampMixin):
     word_count = Column(Integer, nullable=True)
 
     status = Column(String, nullable=False, default=ProjectStatus.draft)
+    storyboard_script_version = Column(Integer, nullable=True)
 
     user = relationship("User", backref="projects")
     presenter = relationship("Presenter", back_populates="projects")
     scenes = relationship("Scene", back_populates="project", order_by="Scene.sequence_number", cascade="all, delete-orphan")
     videos = relationship("Video", back_populates="project", cascade="all, delete-orphan")
+    script_versions = relationship("ScriptVersion", back_populates="project", order_by="ScriptVersion.version_number", cascade="all, delete-orphan")
+    exports = relationship("ProjectExport", back_populates="project", order_by="ProjectExport.version_number", cascade="all, delete-orphan")

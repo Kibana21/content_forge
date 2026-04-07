@@ -1,25 +1,34 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
+from sqlalchemy import select, func
 from app.models.scene import Scene
 from app.models.project import Project
 from app.models.presenter import Presenter
+from app.models.script_version import ScriptVersion
 from app.schemas.scene import SceneCreate, SceneUpdate
 from app.core.exceptions import NotFoundError, ForbiddenError
 from app.services import ai_service
 
 
 def _build_merged_prompt(scene_data: dict, presenter: Presenter | None, brand_kit: str | None) -> str:
+    """
+    Builds the prompt sent to the video generation API for each scene.
+    Must include everything the video AI needs: appearance, delivery style,
+    environment, shot type, and the spoken dialogue.
+    """
     parts = []
     if scene_data.get("dialogue"):
-        parts.append(scene_data["dialogue"])
+        parts.append(f"Dialogue: {scene_data['dialogue']}")
     if scene_data.get("setting"):
-        parts.append(f"\nSetting: {scene_data['setting']}")
+        parts.append(f"Setting: {scene_data['setting']}")
     if presenter and presenter.full_appearance:
-        parts.append(f"\nPresenter: {presenter.full_appearance}")
+        parts.append(f"Presenter appearance: {presenter.full_appearance}")
+    if presenter and presenter.speaking_style:
+        parts.append(f"Delivery style: {presenter.speaking_style}")
+    if scene_data.get("camera_framing"):
+        parts.append(f"Camera: {scene_data['camera_framing']}")
     if brand_kit:
-        parts.append(f"\nBrand kit: {brand_kit}")
+        parts.append(f"Brand: {brand_kit}")
     return "\n".join(parts)
 
 
@@ -61,20 +70,29 @@ async def generate_scenes(db: AsyncSession, project_id: UUID, user_id: UUID) -> 
         presenter = p_result.scalar_one_or_none()
 
     presenter_name = presenter.name.split(" - ")[0] if presenter else "Presenter"
-    raw_scenes = await ai_service.split_into_scenes(project.script, num_scenes, presenter_name)
+    raw_scenes = await ai_service.split_into_scenes(
+        script=project.script,
+        num_scenes=num_scenes,
+        presenter_name=presenter_name,
+        speaking_style=presenter.speaking_style if presenter else None,
+        brand_kit=project.brand_kit,
+        video_type=project.video_type,
+        target_audience=project.target_audience,
+        tone=project.tone,
+    )
 
     # Delete existing scenes for this project
     existing = await db.execute(select(Scene).where(Scene.project_id == project_id))
     for scene in existing.scalars().all():
         await db.delete(scene)
 
-    # Create new scenes
+    # Create new scenes — assign sequence_number from position, never trust AI output
     scenes = []
-    for s in raw_scenes:
+    for idx, s in enumerate(raw_scenes, start=1):
         merged = _build_merged_prompt(s, presenter, project.brand_kit)
         scene = Scene(
             project_id=project_id,
-            sequence_number=s.get("sequence_number", len(scenes) + 1),
+            sequence_number=idx,
             name=s.get("name"),
             dialogue=s.get("dialogue"),
             setting=s.get("setting"),
@@ -85,6 +103,28 @@ async def generate_scenes(db: AsyncSession, project_id: UUID, user_id: UUID) -> 
         )
         db.add(scene)
         scenes.append(scene)
+
+    # Stamp which script version these scenes were generated from.
+    # If no AI versions exist yet (manually written script), create a snapshot now
+    # so there is always a version number to reference.
+    latest_version_result = await db.execute(
+        select(func.max(ScriptVersion.version_number)).where(ScriptVersion.project_id == project_id)
+    )
+    latest_version_number = latest_version_result.scalar()
+
+    if latest_version_number is None:
+        from app.lib.wordcount import word_count
+        snapshot = ScriptVersion(
+            project_id=project_id,
+            version_number=1,
+            script=project.script or "",
+            word_count=word_count(project.script or ""),
+            label="Snapshot at scene generation",
+        )
+        db.add(snapshot)
+        latest_version_number = 1
+
+    project.storyboard_script_version = latest_version_number
 
     await db.commit()
     for scene in scenes:
@@ -108,6 +148,20 @@ async def update_scene(db: AsyncSession, scene_id: UUID, data: SceneUpdate, user
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(scene, field, value)
+
+    # Rebuild merged_prompt whenever content fields change
+    PROMPT_FIELDS = {"dialogue", "setting", "camera_framing"}
+    if data.model_dump(exclude_unset=True).keys() & PROMPT_FIELDS:
+        presenter = None
+        if project.presenter_id:
+            p_result = await db.execute(select(Presenter).where(Presenter.id == project.presenter_id))
+            presenter = p_result.scalar_one_or_none()
+        scene.merged_prompt = _build_merged_prompt(
+            {"dialogue": scene.dialogue, "setting": scene.setting, "camera_framing": scene.camera_framing},
+            presenter,
+            project.brand_kit,
+        )
+
     await db.commit()
     await db.refresh(scene)
     return scene

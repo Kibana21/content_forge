@@ -46,6 +46,7 @@ export interface Project {
   tone: string | null;
   word_count: number | null;
   status: ProjectStatus;
+  storyboard_script_version: number | null;
   presenter_id: string | null;
   presenter: import("./presenter").Presenter | null;
   scenes: import("./scene").Scene[];

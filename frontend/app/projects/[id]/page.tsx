@@ -8,6 +8,7 @@ import { ProjectHero } from "@/components/project/ProjectHero";
 import { StorylineGrid } from "@/components/project/StorylineGrid";
 import { SceneTimeline } from "@/components/project/SceneTimeline";
 import { VideosSection } from "@/components/project/VideosSection";
+import { ExportSection } from "@/components/project/ExportSection";
 import { useProject } from "@/hooks/useProject";
 import { useVideoPolling } from "@/hooks/useVideoPolling";
 import { videosApi } from "@/lib/api/videos";
@@ -79,6 +80,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <ProjectHero project={{ ...project, videos }} onVideoGenerated={handleGenerateVideo} />
         <StorylineGrid project={project} />
         <SceneTimeline scenes={project.scenes || []} projectId={id} />
+        <ExportSection project={project} onSaved={(p) => mutate({ ...project, ...p })} />
         <VideosSection videos={videos} onGenerateNew={handleGenerateVideo} />
       </div>
     </>

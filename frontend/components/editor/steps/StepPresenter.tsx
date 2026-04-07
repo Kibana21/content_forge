@@ -17,6 +17,16 @@ interface StepPresenterProps {
   onSaved: (p: Project) => void;
 }
 
+const PRESET_STYLES = Object.keys(SPEAKING_STYLE_LABELS) as (keyof typeof SPEAKING_STYLE_LABELS)[];
+
+function parseStyles(raw: string | null | undefined): { selected: string[]; custom: string } {
+  if (!raw) return { selected: [], custom: "" };
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const selected = parts.filter((p) => PRESET_STYLES.includes(p as any));
+  const custom = parts.filter((p) => !PRESET_STYLES.includes(p as any)).join(", ");
+  return { selected, custom };
+}
+
 const EMPTY: Partial<Presenter> = {
   name: "", age_range: "Early 30s", appearance_keywords: "", speaking_style: undefined, full_appearance: "",
 };
@@ -26,6 +36,23 @@ export function StepPresenter({ project, onSaved }: StepPresenterProps) {
   const { presenters, fetch: fetchPresenters, add: addPresenter } = usePresenterStore();
   const [form, setForm] = useState<Partial<Presenter>>({ ...EMPTY, ...project.presenter });
   const [saving, setSaving] = useState(false);
+
+  const { selected: selectedStyles, custom: customStyle } = parseStyles(form.speaking_style);
+  const [customStyleInput, setCustomStyleInput] = useState(customStyle);
+
+  function toggleStyle(value: string) {
+    const next = selectedStyles.includes(value)
+      ? selectedStyles.filter((s) => s !== value)
+      : [...selectedStyles, value];
+    const combined = [...next, ...(customStyleInput.trim() ? [customStyleInput.trim()] : [])].join(", ");
+    setForm((f) => ({ ...f, speaking_style: combined as any }));
+  }
+
+  function commitCustomStyle(value: string) {
+    setCustomStyleInput(value);
+    const combined = [...selectedStyles, ...(value.trim() ? [value.trim()] : [])].join(", ");
+    setForm((f) => ({ ...f, speaking_style: combined as any }));
+  }
 
   useEffect(() => { fetchPresenters(); }, []);
 
@@ -114,14 +141,25 @@ export function StepPresenter({ project, onSaved }: StepPresenterProps) {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Speaking Style</label>
-              <div className="pill-group">
+              <label className="form-label">Speaking Style <span>select all that apply</span></label>
+              <div className="pill-group" style={{ marginBottom: 10 }}>
                 {(Object.entries(SPEAKING_STYLE_LABELS) as [string, string][]).map(([value, label]) => (
-                  <button key={value} className={`pill${form.speaking_style === value ? " selected" : ""}`} onClick={() => set("speaking_style", value)}>
+                  <button
+                    key={value}
+                    className={`pill${selectedStyles.includes(value) ? " selected" : ""}`}
+                    onClick={() => toggleStyle(value)}
+                  >
                     {label}
                   </button>
                 ))}
               </div>
+              <input
+                className="form-control"
+                value={customStyleInput}
+                onChange={(e) => setCustomStyleInput(e.target.value)}
+                onBlur={(e) => commitCustomStyle(e.target.value)}
+                placeholder="Or describe your own style… e.g. storytelling, gently humorous"
+              />
             </div>
           </div>
         </div>

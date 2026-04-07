@@ -7,6 +7,7 @@ import { ConsistencyBanner } from "@/components/ui/ConsistencyBanner";
 import { Button } from "@/components/ui/Button";
 import { useEditorStore } from "@/stores/useEditorStore";
 import { scenesApi } from "@/lib/api/scenes";
+import { versionsApi } from "@/lib/api/versions";
 
 const CAMERA_OPTIONS = ["Medium close-up", "Wide shot", "Close-up", "Tracking shot", "Over-the-shoulder"];
 
@@ -250,14 +251,38 @@ export function StepStoryboard({ project, onSaved }: StepStoryboardProps) {
   const [generating, setGenerating] = useState(false);
   const [insertAfter, setInsertAfter] = useState<number | null>(null);
   const [inserting, setInserting] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [latestScriptVersion, setLatestScriptVersion] = useState<number | null>(null);
 
   useEffect(() => { setScenes(project.scenes || []); }, [project.id]);
 
-  async function handleGenerate() {
+  useEffect(() => {
+    versionsApi.listScriptVersions(project.id).then((versions) => {
+      if (versions.length > 0) setLatestScriptVersion(versions[0].version_number);
+    }).catch(() => {});
+  }, [project.id]);
+
+  const isStale =
+    scenes.length > 0 &&
+    latestScriptVersion !== null &&
+    project.storyboard_script_version !== null &&
+    latestScriptVersion > (project.storyboard_script_version ?? 0);
+
+  async function handleGenerate(force = false) {
+    if (!force && scenes.length > 0) {
+      setConfirmRegenerate(true);
+      return;
+    }
+    setConfirmRegenerate(false);
     setGenerating(true);
     try {
-      const generated = await scenesApi.generate(project.id);
+      const { scenes: generated, project: updatedProject } = await scenesApi.generate(project.id);
       setScenes(generated);
+      onSaved(updatedProject);
+      // Refresh latest script version count for staleness check
+      versionsApi.listScriptVersions(project.id).then((versions) => {
+        if (versions.length > 0) setLatestScriptVersion(versions[0].version_number);
+      }).catch(() => {});
     } finally {
       setGenerating(false);
     }
@@ -300,13 +325,73 @@ export function StepStoryboard({ project, onSaved }: StepStoryboardProps) {
         />
       )}
 
+      {/* Regenerate confirm dialog */}
+      {confirmRegenerate && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+            zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          }}
+          onClick={(e) => e.target === e.currentTarget && setConfirmRegenerate(false)}
+        >
+          <div style={{
+            background: "var(--surface)", borderRadius: "var(--radius-lg)",
+            padding: 28, width: "100%", maxWidth: 480, boxShadow: "var(--shadow-lg)",
+          }}>
+            <h2 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800 }}>Regenerate all scenes?</h2>
+            <p style={{ margin: "0 0 20px", fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              This will <strong>delete all {scenes.length} current scenes</strong> and regenerate from the latest script.
+              Any edits you've made to individual scenes — dialogue, settings, camera framing — will be lost.
+            </p>
+            <p style={{ margin: "0 0 24px", fontSize: 13, color: "var(--text-secondary)" }}>
+              If you want to keep your scene edits, go back to the script step and restore an earlier version instead.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <Button variant="ghost" onClick={() => setConfirmRegenerate(false)}>Cancel</Button>
+              <Button onClick={() => handleGenerate(true)} loading={generating}
+                style={{ background: "#dc2626", borderColor: "#dc2626" }}>
+                Yes, regenerate
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="page-content">
-        <h1 style={{ fontSize: 24, fontWeight: 800, margin: "0 0 6px" }}>Storyboard</h1>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "0 0 6px" }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Storyboard</h1>
+          {project.storyboard_script_version != null && (
+            <span style={{
+              fontSize: 12, fontWeight: 700, background: "var(--primary-light)",
+              color: "var(--primary)", padding: "2px 10px", borderRadius: 20,
+            }}>
+              Generated from script v{project.storyboard_script_version}
+            </span>
+          )}
+        </div>
         <p style={{ color: "var(--text-secondary)", margin: "0 0 20px", fontSize: 15 }}>
           {scenes.length > 0
             ? `${scenes.length} scene${scenes.length !== 1 ? "s" : ""}. Edit dialogue, setting, or camera framing directly. Insert new scenes between any two.`
             : "No scenes yet — generate them from your script below."}
         </p>
+
+        {/* Staleness warning */}
+        {isStale && (
+          <div style={{
+            background: "#fefce8", border: "1px solid #fde047", borderRadius: "var(--radius)",
+            padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "flex-start", gap: 10,
+          }}>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#854d0e" }}>
+                Script updated since storyboard was generated (script v{latestScriptVersion} → storyboard from v{project.storyboard_script_version})
+              </div>
+              <div style={{ fontSize: 12, color: "#92400e", marginTop: 3 }}>
+                Your scenes were generated from an earlier version of the script. You can keep editing scenes independently, or regenerate to reflect the latest script — but that will discard your scene edits.
+              </div>
+            </div>
+          </div>
+        )}
 
         {project.presenter && (
           <ConsistencyBanner presenterName={presenterName} brandKit={project.brand_kit} />
@@ -317,7 +402,7 @@ export function StepStoryboard({ project, onSaved }: StepStoryboardProps) {
             <p style={{ color: "var(--text-secondary)", marginBottom: 16 }}>
               No scenes yet. Click below to split your script into scenes automatically.
             </p>
-            <Button loading={generating} onClick={handleGenerate}>
+            <Button loading={generating} onClick={() => handleGenerate(true)}>
               ✨ Generate Scenes from Script
             </Button>
           </div>
@@ -327,7 +412,7 @@ export function StepStoryboard({ project, onSaved }: StepStoryboardProps) {
               <Button variant="outline" size="sm" onClick={() => setInsertAfter(0)}>
                 + Add scene at start
               </Button>
-              <Button variant="outline" size="sm" loading={generating} onClick={handleGenerate}>
+              <Button variant="outline" size="sm" loading={generating} onClick={() => handleGenerate(false)}>
                 ↺ Regenerate all scenes
               </Button>
             </div>

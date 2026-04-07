@@ -21,11 +21,17 @@ export default function EditorPage({ params, searchParams }: {
   const { step: stepParam } = use(searchParams);
   const { project: fetchedProject, mutate } = useProject(id);
   const [project, setProject] = useState<Project | null>(null);
-  const { activeStep, goToStep, reset } = useEditorStore();
+  const { activeStep, goToStep, markStepComplete, reset } = useEditorStore();
 
   useEffect(() => {
     if (fetchedProject && !project) {
       setProject(fetchedProject);
+      // Infer completed steps from project data so the stepper reflects reality
+      const p = fetchedProject;
+      if (p.title && p.video_type && p.target_duration) markStepComplete(1);
+      if (p.presenter_id) markStepComplete(2);
+      if (p.script) markStepComplete(3);
+      if (p.scenes && p.scenes.length > 0) markStepComplete(4);
     }
   }, [fetchedProject]);
 
