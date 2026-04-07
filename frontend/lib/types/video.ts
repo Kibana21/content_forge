@@ -10,6 +10,7 @@ export interface Video {
   duration_seconds: number | null;
   file_url: string | null;
   task_id: string | null;
+  error_message: string | null;
   created_at: string;
   updated_at: string;
 }

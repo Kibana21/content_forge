@@ -81,7 +81,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <StorylineGrid project={project} />
         <SceneTimeline scenes={project.scenes || []} projectId={id} />
         <ExportSection project={project} onSaved={(p) => mutate({ ...project, ...p })} />
-        <VideosSection videos={videos} onGenerateNew={handleGenerateVideo} />
+        <VideosSection
+          videos={videos}
+          onGenerateNew={handleGenerateVideo}
+          onDeleted={(videoId) => setVideos((prev) => prev.filter((v) => v.id !== videoId))}
+        />
       </div>
     </>
   );

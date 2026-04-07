@@ -43,6 +43,17 @@ async def generate_video(
     if project.user_id != user_id:
         raise ForbiddenError()
 
+    # Block if a video is already queued or rendering
+    active_result = await db.execute(
+        select(Video).where(
+            Video.project_id == project_id,
+            Video.status.in_([VideoStatus.queued, VideoStatus.rendering]),
+        )
+    )
+    if active_result.scalar_one_or_none():
+        from app.core.exceptions import ConflictError
+        raise ConflictError("A video is already being generated for this project")
+
     # Count existing versions for auto-title
     count_result = await db.execute(select(Video).where(Video.project_id == project_id))
     existing_count = len(list(count_result.scalars().all()))

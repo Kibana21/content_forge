@@ -23,5 +23,6 @@ class Video(Base, UUIDMixin, TimestampMixin):
     duration_seconds = Column(Integer, nullable=True)
     file_url = Column(String, nullable=True)
     task_id = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
 
     project = relationship("Project", back_populates="videos")

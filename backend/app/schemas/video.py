@@ -19,6 +19,7 @@ class VideoResponse(BaseModel):
     duration_seconds: Optional[int]
     file_url: Optional[str]
     task_id: Optional[str]
+    error_message: Optional[str]
     created_at: datetime
     updated_at: datetime
 

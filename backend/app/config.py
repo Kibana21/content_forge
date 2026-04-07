@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     GOOGLE_APPLICATION_CREDENTIALS: str = "../video-key.json"
     GOOGLE_CLOUD_PROJECT: str = "gen-lang-client-0913704662"
     GOOGLE_CLOUD_LOCATION: str = "us-central1"
+    VEO_MODEL: str = "veo-3.1-generate-001"
+    VIDEO_OUTPUT_DIR: str = "output/videos"
 
     # JWT
     JWT_SECRET_KEY: str = "dev-secret-key-change-in-production"
