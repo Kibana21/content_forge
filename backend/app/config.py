@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/story_studio"
-    REDIS_URL: str = "redis://default:7kqABVVfvMLYoFvNSyP3WDgRRT71L43f@redis-10454.c83.us-east-1-2.ec2.cloud.redislabs.com:10454/0"
+    DATABASE_URL: str = "postgresql+asyncpg://content_forge_user:PASSWORD@localhost:5432/content_forge_db"
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     # Gemini API key (kept for reference, not used for text generation)
     GEMINI_API_KEY: str = ""
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     # Google Vertex AI (video generation)
     GOOGLE_APPLICATION_CREDENTIALS: str = "../video-key.json"
-    GOOGLE_CLOUD_PROJECT: str = "gen-lang-client-0913704662"
+    GOOGLE_CLOUD_PROJECT: str = ""
     GOOGLE_CLOUD_LOCATION: str = "us-central1"
     VEO_MODEL: str = "veo-3.1-generate-001"
     VIDEO_OUTPUT_DIR: str = "output/videos"
