@@ -4,6 +4,14 @@ A guided web application that takes business users from a video idea through pre
 
 ---
 
+
+# Content Forge — Youtube video
+
+
+https://www.youtube.com/watch?v=Ay27UmT8qW8
+
+---
+
 ## What it does
 
 1. **Brief** — define video type, target audience, duration, brand kit, and CTA
